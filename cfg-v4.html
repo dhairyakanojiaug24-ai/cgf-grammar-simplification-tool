@@ -1,0 +1,1489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CFG Simplifier — Dhairya Kanojia</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5ead8;
+  --surface:#fffdf9;
+  --surface2:#fff6ec;
+  --sb-bg:#1e0e04;
+  --sb-hover:#2e1a0a;
+  --sb-active:#3d2410;
+  --espresso:#1e0e04;
+  --roast:#4a2008;
+  --mocha:#7a3c10;
+  --caramel:#b5651d;
+  --tan:#d4956a;
+  --latte:#e8c49a;
+  --cream:#f4e4cc;
+  --parchment:#fdf6ec;
+  --gold:#d4a24c;
+  --t1:#1e0e04;
+  --t2:#5a3015;
+  --t3:#906040;
+  --t4:#c09060;
+  --bd:rgba(139,69,19,.13);
+  --bdh:rgba(90,40,8,.26);
+  --SBW:260px;
+  --SBW-MIN:64px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif}
+
+
+/* ══ APP SHELL ══ */
+.app{display:flex;height:100vh;position:relative;z-index:1}
+
+/* ══════════════════════════════════════
+   SIDEBAR
+══════════════════════════════════════ */
+.sidebar{
+  width:var(--SBW);
+  min-width:var(--SBW);
+  background:var(--sb-bg);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+  position:relative;z-index:20;
+  transition:width .32s cubic-bezier(.4,0,.2,1), min-width .32s cubic-bezier(.4,0,.2,1);
+  box-shadow:3px 0 40px rgba(20,8,0,.35);
+  /* subtle grain texture */
+  background-image:
+    radial-gradient(ellipse at 0% 0%, rgba(212,149,106,.06) 0%, transparent 60%),
+    radial-gradient(ellipse at 100% 100%, rgba(100,40,0,.12) 0%, transparent 50%);
+}
+.sidebar.mini{
+  width:var(--SBW-MIN);
+  min-width:var(--SBW-MIN);
+}
+
+/* ── top glow line ── */
+.sidebar::before{
+  content:'';
+  position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg, transparent, rgba(212,149,106,.4), transparent);
+}
+
+/* ── LOGO ── */
+.sb-logo{
+  padding:1.2rem 0 1rem;
+  display:flex;align-items:center;
+  border-bottom:1px solid rgba(255,255,255,.05);
+  overflow:hidden;white-space:nowrap;
+  min-height:64px;
+  flex-shrink:0;
+  position:relative;
+}
+.sb-logo-icon{
+  width:var(--SBW-MIN);min-width:var(--SBW-MIN);
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;font-size:1.3rem;
+  transition:transform .25s ease;
+}
+.sb-logo:hover .sb-logo-icon{ transform:scale(1.1) rotate(-5deg); }
+.sb-logo-text{
+  font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:900;
+  color:#f0d8b8;letter-spacing:.02em;
+  opacity:1;transition:opacity .2s ease;
+}
+.sidebar.mini .sb-logo-text{opacity:0;pointer-events:none}
+
+/* steam animation */
+.steam{display:flex;gap:2px;align-items:flex-end;margin-right:3px}
+.sp{width:2px;background:var(--tan);border-radius:2px;animation:stm 2s ease-in-out infinite}
+.sp:nth-child(1){height:8px;animation-delay:0s}
+.sp:nth-child(2){height:5px;animation-delay:.28s}
+.sp:nth-child(3){height:8px;animation-delay:.56s}
+@keyframes stm{0%,100%{transform:translateY(0);opacity:.85}50%{transform:translateY(-5px);opacity:.15}}
+
+
+/* ── SECTION LABEL ── */
+.sb-section{
+  padding:.9rem 0 .35rem var(--SBW-MIN);
+  font-family:'DM Mono',monospace;font-size:.52rem;letter-spacing:.22em;
+  color:rgba(212,149,106,.38);white-space:nowrap;overflow:hidden;
+  transition:opacity .2s;flex-shrink:0;
+}
+.sidebar.mini .sb-section{opacity:0}
+
+/* ── NAV ITEMS ── */
+.sb-item{
+  display:flex;align-items:center;
+  padding:0;margin:2px 8px;border-radius:10px;
+  background:none;border:none;cursor:pointer;text-align:left;
+  width:calc(100% - 16px);
+  color:rgba(240,216,184,.5);
+  transition:all .22s ease;
+  overflow:hidden;white-space:nowrap;
+  position:relative;
+  flex-shrink:0;
+}
+/* animated left accent bar */
+.sb-item::before{
+  content:'';
+  position:absolute;left:0;top:20%;height:60%;width:2px;border-radius:2px;
+  background:var(--tan);
+  transform:scaleY(0);transform-origin:center;
+  transition:transform .22s ease;
+}
+.sb-item:hover::before{ transform:scaleY(1); }
+.sb-item.on::before{ transform:scaleY(1);background:var(--gold); }
+
+.sb-icon-wrap{
+  width:var(--SBW-MIN);min-width:var(--SBW-MIN);height:44px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.95rem;flex-shrink:0;
+  transition:transform .22s ease;
+}
+.sb-item:hover .sb-icon-wrap{ transform:scale(1.15); }
+.sb-item-label{
+  font-size:.84rem;font-weight:500;
+  color:rgba(240,216,184,.55);
+  transition:color .2s,opacity .2s;
+  padding-right:1rem;
+}
+.sb-item:hover .sb-item-label{ color:#f0d8b8; }
+.sb-item:hover{ background:rgba(255,255,255,.055); }
+.sb-item.on{
+  background:linear-gradient(90deg, rgba(212,149,106,.16), rgba(212,149,106,.06));
+}
+.sb-item.on .sb-item-label{ color:#f0d8b8; }
+.sb-item.on .sb-icon-wrap{ color:var(--gold); }
+
+.sidebar.mini .sb-item-label{ opacity:0; }
+
+/* ── TOOLTIP on mini ── */
+.sb-item[data-tip]{position:relative}
+.sidebar.mini .sb-item[data-tip]:hover::after{
+  content:attr(data-tip);
+  position:absolute;left:calc(var(--SBW-MIN) + 8px);top:50%;
+  transform:translateY(-50%);
+  background:var(--sb-active);color:#f0d8b8;
+  padding:4px 10px;border-radius:7px;
+  font-family:'DM Mono',monospace;font-size:.72rem;
+  white-space:nowrap;pointer-events:none;
+  border:1px solid rgba(212,149,106,.2);
+  box-shadow:0 4px 12px rgba(0,0,0,.3);
+  z-index:100;
+}
+
+/* ── DIVIDER ── */
+.sb-divider{
+  height:1px;
+  background:linear-gradient(90deg,transparent,rgba(212,149,106,.12),transparent);
+  margin:.6rem 1rem;flex-shrink:0;
+}
+
+/* ── EXAMPLE LIST IN SIDEBAR ── */
+.sb-ex-list{
+  overflow-y:auto;overflow-x:hidden;flex:1;
+  padding:0 6px 6px;display:flex;flex-direction:column;gap:1px;
+}
+.sb-ex-list::-webkit-scrollbar{width:0}
+.sb-ex-btn{
+  padding:.48rem 0 .48rem var(--SBW-MIN);
+  border-radius:8px;background:none;border:none;cursor:pointer;text-align:left;
+  transition:all .2s;overflow:hidden;white-space:nowrap;
+  width:100%;position:relative;flex-shrink:0;
+}
+.sb-ex-btn::before{
+  content:'';
+  position:absolute;left:0;top:15%;height:70%;width:2px;border-radius:2px;
+  background:var(--tan);transform:scaleY(0);transform-origin:center;
+  transition:transform .2s;
+}
+.sb-ex-btn:hover::before{transform:scaleY(1)}
+.sb-ex-btn:hover{background:rgba(212,149,106,.07)}
+.ex-dot{
+  position:absolute;left:calc(var(--SBW-MIN)/2 - 4px);top:50%;
+  transform:translateY(-50%);
+  width:8px;height:8px;border-radius:50%;
+  background:rgba(212,149,106,.25);border:1px solid rgba(212,149,106,.35);
+  transition:all .2s;
+}
+.sb-ex-btn:hover .ex-dot{
+  background:var(--tan);border-color:var(--tan);
+  box-shadow:0 0 6px rgba(212,149,106,.4);
+}
+.ex-name-s{display:block;font-size:.72rem;font-weight:500;color:rgba(240,216,184,.62);line-height:1.3}
+.ex-tag-s{font-family:'DM Mono',monospace;font-size:.54rem;letter-spacing:.08em;color:rgba(212,149,106,.4)}
+.sidebar.mini .sb-ex-list{display:none}
+
+/* ── BOTTOM ── */
+.sb-bottom{
+  padding:1rem 0 1rem;
+  border-top:1px solid rgba(255,255,255,.05);
+  flex-shrink:0;overflow:hidden;
+}
+.sb-author-row{
+  display:flex;align-items:center;overflow:hidden;white-space:nowrap;
+}
+.sb-author-icon{
+  width:var(--SBW-MIN);min-width:var(--SBW-MIN);
+  display:flex;align-items:center;justify-content:center;
+  font-size:.9rem;opacity:.45;
+}
+.sb-author-text{
+  font-family:'DM Mono',monospace;font-size:.58rem;
+  color:rgba(212,149,106,.38);line-height:1.6;
+  transition:opacity .2s;
+}
+.sidebar.mini .sb-author-text{opacity:0}
+
+/* ══════════════════════════════════════
+   MAIN AREA
+══════════════════════════════════════ */
+.main{
+  flex:1;display:flex;flex-direction:column;
+  overflow-y:auto;overflow-x:hidden;
+  background:var(--bg);
+  min-width:0;
+}
+.main::-webkit-scrollbar{width:5px}
+.main::-webkit-scrollbar-track{background:var(--bg)}
+.main::-webkit-scrollbar-thumb{background:rgba(139,69,19,.22);border-radius:3px}
+
+/* ── TOPBAR ── */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.75rem 1.8rem;gap:1rem;flex-wrap:wrap;
+  background:rgba(245,234,216,.88);backdrop-filter:blur(14px);
+  border-bottom:1px solid rgba(181,101,29,.15);
+  position:sticky;top:0;z-index:50;
+  box-shadow:0 2px 16px rgba(100,50,0,.06);
+}
+.page-title{
+  font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:700;
+  color:var(--espresso);display:flex;align-items:center;gap:8px;
+}
+.topbar-btns{display:flex;gap:6px;flex-wrap:wrap}
+.btn{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:.44rem .9rem;border-radius:8px;
+  font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.03em;
+  cursor:pointer;border:1px solid var(--bdh);
+  background:transparent;color:var(--roast);transition:all .18s;font-weight:500;
+}
+.btn:hover{background:var(--cream);border-color:var(--caramel);color:var(--espresso)}
+.btn:active{transform:scale(.97)}
+.btn.pri{
+  background:var(--espresso);border-color:var(--espresso);
+  color:var(--cream);font-weight:600;
+  box-shadow:0 2px 12px rgba(30,14,4,.2);
+}
+.btn.pri:hover{background:var(--roast);box-shadow:0 4px 16px rgba(30,14,4,.25)}
+.btn.sm{padding:.28rem .65rem;font-size:.62rem}
+.btn.red{border-color:rgba(150,50,30,.28);color:#8a3520}
+.btn.red:hover{background:rgba(150,50,30,.06)}
+
+
+/* ── VIEWS ── */
+.view{display:none;padding:1.5rem 1.8rem;flex:1}
+.view.on{display:block}
+
+/* ── SIMP GRID ── */
+.simp-grid{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:1.2rem;align-items:start;
+}
+@media(max-width:900px){.simp-grid{grid-template-columns:1fr}}
+
+/* ── CARD ── */
+.card{
+  background:var(--surface);border:1px solid var(--bd);
+  border-radius:13px;padding:1.2rem;
+  box-shadow:0 2px 14px rgba(100,50,0,.05);
+  transition:box-shadow .22s,border-color .22s;
+}
+.card:hover{box-shadow:0 5px 22px rgba(100,50,0,.09);border-color:var(--bdh)}
+.card-ttl{
+  font-family:'DM Mono',monospace;font-size:.59rem;letter-spacing:.18em;
+  color:var(--caramel);margin-bottom:.85rem;
+  display:flex;align-items:center;gap:6px;
+}
+.card-ttl::before{content:'';width:12px;height:2px;background:var(--caramel);border-radius:2px}
+
+/* ── INPUTS ── */
+.flbl{font-family:'DM Mono',monospace;font-size:.59rem;letter-spacing:.1em;color:var(--t3);margin-bottom:.3rem}
+.sym-i{
+  width:52px;padding:.4rem .55rem;
+  background:var(--surface2);border:1px solid var(--bd);
+  border-radius:7px;color:var(--t1);
+  font-family:'DM Mono',monospace;font-size:.9rem;
+  outline:none;text-align:center;transition:border-color .18s,box-shadow .18s;
+}
+.sym-i:focus{border-color:var(--caramel);box-shadow:0 0 0 3px rgba(181,101,29,.1)}
+.gram-ta{
+  width:100%;min-height:138px;
+  background:var(--surface2);border:1px solid var(--bd);
+  border-radius:9px;padding:.75rem .88rem;
+  color:var(--t1);font-family:'DM Mono',monospace;
+  font-size:.82rem;line-height:1.75;resize:vertical;outline:none;
+  transition:border-color .18s,box-shadow .18s;
+}
+.gram-ta:focus{border-color:var(--caramel);box-shadow:0 0 0 3px rgba(181,101,29,.1)}
+.gram-ta::placeholder{color:var(--t4)}
+
+/* ── BUTTONS ROW ── */
+.brow{display:flex;gap:6px;flex-wrap:wrap;margin-top:.72rem}
+
+/* ── INPUT HELPER BUTTONS (ε and →) ── */
+.input-helpers{display:flex;gap:5px;margin-bottom:.5rem;align-items:center;flex-wrap:wrap}
+.helper-lbl{font-family:'DM Mono',monospace;font-size:.53rem;letter-spacing:.1em;color:var(--t4);margin-right:2px}
+.ins-btn{
+  padding:.28rem .62rem;border-radius:7px;
+  background:rgba(181,101,29,.08);border:1px solid rgba(181,101,29,.2);
+  color:var(--mocha);font-family:'DM Mono',monospace;font-size:.82rem;
+  cursor:pointer;transition:all .16s;line-height:1;
+}
+.ins-btn:hover{background:rgba(181,101,29,.17);border-color:var(--caramel);transform:scale(1.06)}
+.ins-btn:active{transform:scale(.96)}
+
+/* ── TYPO FIX BADGE ── */
+.typo-badge{
+  display:none;align-items:center;gap:5px;
+  background:rgba(212,149,106,.12);border:1px solid rgba(181,101,29,.25);
+  border-radius:8px;padding:.26rem .65rem;
+  font-family:'DM Mono',monospace;font-size:.6rem;color:var(--mocha);
+  cursor:pointer;transition:all .18s;
+}
+.typo-badge:hover{background:rgba(212,149,106,.22)}
+.typo-badge.show{display:flex}
+
+/* ── ABSTRACTION VISUALIZER ── */
+.abs-panel{
+  background:var(--surface2);border:1px solid var(--bd);
+  border-radius:11px;padding:.9rem 1rem;margin-top:.9rem;
+  min-height:80px;overflow:hidden;
+}
+.abs-panel-ttl{font-family:'DM Mono',monospace;font-size:.55rem;letter-spacing:.18em;color:var(--caramel);margin-bottom:.65rem;display:flex;align-items:center;gap:6px}
+.abs-panel-ttl::before{content:'';width:10px;height:2px;background:var(--caramel);border-radius:2px}
+.abs-rules{display:flex;flex-direction:column;gap:4px;min-height:40px}
+.abs-rule{
+  display:inline-flex;align-items:center;
+  font-family:'DM Mono',monospace;font-size:.72rem;
+  padding:.22rem .55rem;border-radius:6px;
+  background:rgba(181,101,29,.07);border:1px solid rgba(181,101,29,.13);
+  color:var(--t1);
+  transition:all .45s ease;
+  width:fit-content;max-width:100%;
+}
+.abs-rule.removing{
+  background:rgba(180,40,20,.08);border-color:rgba(180,40,20,.25);
+  color:rgba(150,40,20,.7);
+  text-decoration:line-through;
+  opacity:.55;transform:translateX(8px) scale(.97);
+}
+.abs-rule.gone{
+  opacity:0;transform:translateX(18px) scale(.92);
+  max-height:0;padding:0;margin:0;border-width:0;
+}
+.abs-rule.arriving{
+  background:rgba(40,120,40,.07);border-color:rgba(40,120,40,.25);
+  color:#1e5c1e;
+  animation:ruleArrive .5s ease forwards;
+}
+@keyframes ruleArrive{
+  from{opacity:0;transform:translateX(-14px) scale(.95)}
+  to{opacity:1;transform:translateX(0) scale(1)}
+}
+.abs-step-lbl{font-family:'DM Mono',monospace;font-size:.55rem;letter-spacing:.1em;color:var(--t4);padding:.3rem 0 .15rem;margin-top:.3rem}
+.abs-empty{color:var(--t4);font-family:'DM Mono',monospace;font-size:.72rem;text-align:center;padding:.8rem;}
+
+/* ── CHIPS ── */
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:.75rem}
+.chip{
+  background:rgba(181,101,29,.07);border:1px solid rgba(181,101,29,.16);
+  border-radius:7px;padding:.32rem .65rem;
+  font-family:'DM Mono',monospace;
+  display:flex;flex-direction:column;align-items:center;
+}
+.chip .v{color:var(--mocha);font-size:.88rem;font-weight:600}
+.chip .l{color:var(--t4);font-size:.55rem}
+
+/* ── PROGRESS ── */
+.prog-w{height:3px;background:rgba(181,101,29,.1);border-radius:2px;overflow:hidden;margin-bottom:.88rem}
+.prog-b{height:100%;width:0%;background:linear-gradient(90deg,var(--caramel),var(--mocha));border-radius:2px;transition:width .5s ease}
+
+/* ── STEPS ── */
+.steps{display:flex;flex-direction:column}
+.si{display:grid;grid-template-columns:36px 1fr;gap:0 10px;opacity:0;transform:translateX(-10px);transition:opacity .38s,transform .38s;position:relative}
+.si.vis{opacity:1;transform:translateX(0)}
+.si:not(:last-child) .vl{position:absolute;left:17px;top:36px;bottom:0;width:2px;background:linear-gradient(to bottom,var(--tan),transparent)}
+.snum{width:36px;height:36px;border-radius:50%;background:var(--surface2);border:2px solid var(--tan);display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:.65rem;color:var(--mocha);font-weight:600;flex-shrink:0;box-shadow:0 2px 7px rgba(100,50,0,.1)}
+.sbody{padding-bottom:.95rem}
+.sbody h3{font-size:.85rem;font-weight:600;color:var(--espresso);margin-bottom:2px}
+.sbody p{font-size:.75rem;color:var(--t3);line-height:1.56}
+.sres{margin-top:6px;background:var(--surface2);border:1px solid var(--bd);border-left:3px solid var(--tan);border-radius:8px;padding:.58rem .78rem;font-family:'DM Mono',monospace;font-size:.71rem;line-height:1.7;color:var(--t1);white-space:pre-wrap}
+.bgs{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px}
+.bg{font-family:'DM Mono',monospace;font-size:.57rem;padding:2px 7px;border-radius:10px}
+.bg.r{background:rgba(150,50,30,.08);color:#7a2818;border:1px solid rgba(150,50,30,.18)}
+.bg.a{background:rgba(40,110,40,.08);color:#1e5c1e;border:1px solid rgba(40,110,40,.18)}
+.bg.i{background:rgba(181,101,29,.09);color:var(--mocha);border:1px solid rgba(181,101,29,.2)}
+
+/* ── OUTPUT ── */
+.out-box{background:var(--surface2);border:1px solid var(--bd);border-left:3px solid var(--caramel);border-radius:10px;padding:.85rem .95rem;font-family:'DM Mono',monospace;font-size:.8rem;line-height:1.8;color:var(--t1);white-space:pre-wrap;min-height:60px}
+.out-ph{color:var(--t4);font-style:italic}
+.empty{text-align:center;padding:1.6rem 1rem;color:var(--t4);font-family:'DM Mono',monospace;font-size:.74rem;line-height:1.85}
+.empty .big{font-size:2.2rem;display:block;margin-bottom:.45rem}
+
+/* ── THEORY ── */
+.theory-2col{display:grid;grid-template-columns:190px 1fr;gap:1.2rem;align-items:start}
+@media(max-width:800px){.theory-2col{grid-template-columns:1fr}}
+.tnav{display:flex;flex-direction:column;gap:2px}
+.tnav-btn{
+  display:flex;align-items:center;gap:9px;padding:.6rem .88rem;border-radius:9px;
+  background:transparent;border:none;cursor:pointer;text-align:left;
+  font-size:.81rem;font-weight:500;color:var(--t2);transition:all .18s;
+}
+.tnav-btn:hover{background:var(--cream);color:var(--espresso)}
+.tnav-btn.on{background:var(--espresso);color:var(--cream)}
+.tnav-n{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:.6rem;font-weight:600;background:rgba(181,101,29,.1);color:var(--mocha);flex-shrink:0}
+.tnav-btn.on .tnav-n{background:rgba(255,255,255,.14);color:var(--cream)}
+.tpane{display:none}
+.tpane.on{display:block}
+.tpane h2{font-family:'Playfair Display',serif;font-size:1.32rem;font-weight:700;color:var(--espresso);margin-bottom:.3rem}
+.tpane .sub{color:var(--t3);font-size:.84rem;margin-bottom:1rem;line-height:1.62}
+.tstep{display:flex;gap:11px;align-items:flex-start;background:var(--surface2);border:1px solid var(--bd);border-left:3px solid var(--tan);border-radius:9px;padding:.68rem .92rem;margin-bottom:.7rem}
+.tstep-n{font-family:'DM Mono',monospace;color:var(--caramel);font-size:.77rem;font-weight:600;min-width:20px;padding-top:1px}
+.tstep p{font-size:.79rem;color:var(--t2);line-height:1.58}
+.tstep code{font-family:'DM Mono',monospace;background:rgba(181,101,29,.09);color:var(--mocha);padding:1px 5px;border-radius:4px;font-size:.75rem}
+.tip{background:rgba(181,101,29,.05);border:1px solid rgba(181,101,29,.17);border-radius:9px;padding:.78rem .92rem;margin-top:.88rem;font-size:.79rem;color:var(--t2);line-height:1.65}
+.tip code{font-family:'DM Mono',monospace;background:rgba(181,101,29,.1);color:var(--mocha);padding:1px 5px;border-radius:4px;font-size:.75rem}
+
+/* ── EXAMPLES ── */
+.ex-hdr{margin-bottom:1.05rem}
+.ex-hdr h2{font-family:'Playfair Display',serif;font-size:1.32rem;color:var(--espresso);margin-bottom:.28rem}
+.ex-hdr p{color:var(--t3);font-size:.83rem;line-height:1.55}
+.ex-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(275px,1fr));gap:1.05rem}
+.ex-card{background:var(--surface);border:1px solid var(--bd);border-radius:13px;overflow:hidden;box-shadow:0 2px 10px rgba(100,50,0,.05);transition:all .22s;display:flex;flex-direction:column}
+.ex-card:hover{box-shadow:0 6px 22px rgba(100,50,0,.1);border-color:var(--bdh);transform:translateY(-2px)}
+.ex-card-h{padding:.68rem .92rem .52rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bd);background:var(--cream)}
+.ex-card-h h3{font-size:.83rem;font-weight:700;color:var(--espresso)}
+.ex-tag{font-family:'DM Mono',monospace;font-size:.55rem;padding:2px 7px;border-radius:10px;letter-spacing:.07em;background:rgba(181,101,29,.1);color:var(--mocha);border:1px solid rgba(181,101,29,.2)}
+.ex-cols{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--bd)}
+.ex-col{padding:.68rem .82rem}
+.ex-col:first-child{border-right:1px solid var(--bd)}
+.ex-col-lbl{font-family:'DM Mono',monospace;font-size:.55rem;letter-spacing:.12em;margin-bottom:4px}
+.ex-col-lbl.b{color:var(--t4)}
+.ex-col-lbl.a{color:#2a6a2a}
+.ex-code{font-family:'DM Mono',monospace;font-size:.69rem;line-height:1.58;white-space:pre-wrap}
+.ex-code.b{color:var(--t3)}
+.ex-code.a{color:var(--espresso)}
+.ex-pills{display:flex;flex-wrap:wrap;gap:3px;padding:.42rem .82rem;border-bottom:1px solid var(--bd)}
+.ex-pill{font-family:'DM Mono',monospace;font-size:.55rem;padding:2px 7px;border-radius:10px}
+.ex-pill.r{background:rgba(150,50,30,.08);color:#7a2818;border:1px solid rgba(150,50,30,.17)}
+.ex-pill.a{background:rgba(40,110,40,.08);color:#1e5c1e;border:1px solid rgba(40,110,40,.17)}
+.ex-desc{padding:.52rem .82rem;font-size:.74rem;color:var(--t3);line-height:1.55;flex:1}
+.ex-foot{padding:.58rem .82rem;border-top:1px solid var(--bd)}
+.ex-run{
+  width:100%;padding:.48rem;
+  background:var(--espresso);border:none;border-radius:8px;
+  color:var(--cream);font-family:'DM Mono',monospace;font-size:.69rem;
+  letter-spacing:.05em;cursor:pointer;transition:all .18s;
+  display:flex;align-items:center;justify-content:center;gap:6px;font-weight:500;
+}
+.ex-run:hover{background:var(--roast);box-shadow:0 4px 12px rgba(30,14,4,.2);transform:translateY(-1px)}
+.ex-run:active{transform:scale(.98)}
+
+/* ── TOAST ── */
+#toast{
+  position:fixed;bottom:1.4rem;right:1.4rem;
+  background:var(--espresso);color:var(--cream);
+  padding:.62rem 1.1rem;border-radius:10px;
+  font-family:'DM Mono',monospace;font-size:.76rem;
+  box-shadow:0 4px 18px rgba(30,14,4,.25);z-index:9999;
+  transform:translateY(55px);opacity:0;transition:all .28s ease;
+}
+#toast.show{transform:translateY(0);opacity:1}
+
+/* ── MODAL ── */
+.mbg{position:fixed;inset:0;background:rgba(30,14,4,.42);backdrop-filter:blur(8px);z-index:300;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s}
+.mbg.open{opacity:1;pointer-events:all}
+.modal{background:var(--surface);border:1px solid var(--bdh);border-radius:16px;padding:1.7rem;max-width:430px;width:92%;transform:scale(.93);transition:transform .25s}
+.mbg.open .modal{transform:scale(1)}
+.modal h2{font-family:'Playfair Display',serif;font-size:1.15rem;color:var(--espresso);margin-bottom:.8rem}
+.modal p{font-size:.8rem;color:var(--t2);line-height:1.7;margin-bottom:.58rem}
+.modal-close{float:right;background:none;border:none;color:var(--t3);font-size:1.2rem;cursor:pointer}
+.mcod{background:var(--surface2);border:1px solid var(--bd);border-radius:8px;padding:.75rem;margin:.65rem 0;font-family:'DM Mono',monospace;font-size:.74rem;color:var(--t1);line-height:1.7}
+.ci{font-family:'DM Mono',monospace;background:rgba(181,101,29,.09);color:var(--mocha);padding:1px 5px;border-radius:4px;font-size:.78rem}
+
+/* ── FOOTER ── */
+footer{text-align:center;padding:1.2rem;color:var(--t4);font-size:.65rem;font-family:'DM Mono',monospace;border-top:1px solid var(--bd);flex-shrink:0}
+footer span{color:var(--mocha)}
+
+
+
+/* ══════════════════════════════════════════════════
+   SHARED FLOATING BEAN — darker, subtle drift
+   Uses the existing `drift` keyframe with tiny offsets
+   so beans gently bob in place rather than tumble far
+══════════════════════════════════════════════════ */
+
+/* Base style applied to ALL .bean across every view */
+.bean {
+  background: rgba(90,40,10,.14);
+  box-shadow: inset 0 2px 3px rgba(30,10,2,.12), 0 1px 2px rgba(90,40,10,.08);
+}
+.bean::after {
+  background: rgba(40,15,2,.28);
+  box-shadow: 0 1px 0 rgba(50,18,2,.15), 0 -1px 0 rgba(50,18,2,.15);
+}
+
+/* ════════════════════════════════════════════════════
+   VERSION B — CREATIVE ANIMATION SYSTEM
+   "Coffee Cosmos" — beans orbit, steam spirals, ink drops,
+   particle constellations, pulse waves, cursor sparkle
+════════════════════════════════════════════════════ */
+
+/* ── sidebar mist (keep) ── */
+.sb-mist{position:absolute;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
+.mist-layer{
+  position:absolute;left:-30%;right:-30%;border-radius:50%;
+  background:radial-gradient(ellipse at 50% 100%,rgba(212,149,106,var(--ma,.07)) 0%,rgba(181,101,29,calc(var(--ma,.07)*.3)) 45%,transparent 72%);
+  animation:mistUp var(--md,8s) ease-in-out infinite var(--mdel,0s);
+}
+@keyframes mistUp{0%{transform:translateY(0) scaleX(1);opacity:.5;}30%{opacity:1;}100%{transform:translateY(var(--mdy,-110px)) scaleX(var(--msx,1.12));opacity:0;}}
+.m1{height:160px;bottom:-25px;--ma:.12;--md:7s;--mdel:0s;--mdy:-140px;--msx:1.22;}
+.m2{height:120px;bottom:-15px;--ma:.08;--md:9.5s;--mdel:2s;--mdy:-110px;--msx:1.1;}
+.m3{height:200px;bottom:-40px;--ma:.06;--md:11s;--mdel:4s;--mdy:-180px;--msx:1.28;}
+.m4{height:130px;bottom:-10px;--ma:.10;--md:8s;--mdel:5.5s;--mdy:-120px;--msx:1.14;}
+.m5{height:100px;bottom:5px;--ma:.05;--md:10s;--mdel:2.8s;--mdy:-95px;--msx:1.08;}
+.sidebar > *:not(.sb-mist){position:relative;z-index:1;}
+
+/* view layer */
+.vbg{position:absolute;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
+.view{position:relative;}
+.view > *:not(.vbg){position:relative;z-index:1;}
+
+/* ══ KEYFRAMES ══ */
+
+/* 1. Bean floating drift — gentle bob with slight rotation */
+@keyframes bFloat{
+  0%  {transform:translate(0,0) rotate(var(--r0,0deg)) scale(1);}
+  25% {transform:translate(var(--fx1,12px),var(--fy1,-18px)) rotate(var(--fr1,15deg)) scale(1.04);}
+  55% {transform:translate(var(--fx2,-10px),var(--fy2,-32px)) rotate(var(--fr2,-8deg)) scale(.97);}
+  80% {transform:translate(var(--fx3,8px),var(--fy3,-22px)) rotate(var(--fr3,20deg)) scale(1.02);}
+  100%{transform:translate(0,0) rotate(var(--r0,0deg)) scale(1);}
+}
+
+/* 2. Orbit — bean rotates around a centre point */
+@keyframes orbit{
+  from{transform:rotate(0deg) translateX(var(--or,60px)) rotate(0deg);}
+  to  {transform:rotate(360deg) translateX(var(--or,60px)) rotate(-360deg);}
+}
+
+/* 3. Ink drop — expands like a drop landing in coffee */
+@keyframes inkDrop{
+  0%  {transform:scale(0);opacity:.9;}
+  40% {opacity:.55;}
+  100%{transform:scale(var(--is,4.5));opacity:0;}
+}
+
+/* 4. Steam curl — rises & fades with a slight wave */
+@keyframes steamCurl{
+  0%  {transform:translateY(0) scaleX(1) rotate(0deg);opacity:0;}
+  10% {opacity:var(--sa,.18);}
+  60% {transform:translateY(var(--sy,-120px)) scaleX(1.3) rotate(var(--ss,12deg));}
+  100%{transform:translateY(var(--sy2,-210px)) scaleX(.6) rotate(var(--ss2,-8deg));opacity:0;}
+}
+
+/* 5. Particle sparkle — tiny dots burst outward */
+@keyframes sparkle{
+  0%  {transform:translate(0,0) scale(1);opacity:.9;}
+  100%{transform:translate(var(--spx,30px),var(--spy,-40px)) scale(0);opacity:0;}
+}
+
+/* 6. Constellation pulse — node pulses gently */
+@keyframes cPulse{
+  0%,100%{transform:scale(1);opacity:var(--ca,.5);}
+  50%{transform:scale(1.6);opacity:var(--ca2,.85);}
+}
+
+/* 7. Slow spin for ring halos */
+@keyframes haloPulse{
+  0%  {transform:scale(.05) rotate(0deg);opacity:.9;}
+  70% {opacity:.12;}
+  100%{transform:scale(var(--hs,5)) rotate(40deg);opacity:0;}
+}
+
+/* 8. Wave ripple for theory */
+@keyframes wavePass{
+  0%  {transform:translateX(-100%) scaleY(1);}
+  50% {transform:translateX(0%) scaleY(1.4);}
+  100%{transform:translateX(100%) scaleY(1);}
+}
+
+/* 9. Roast glow — warm amber pulsing orb */
+@keyframes roastGlow{
+  0%,100%{transform:scale(1);opacity:var(--ga,.08);}
+  50%{transform:scale(1.18);opacity:calc(var(--ga,.08)*1.8);}
+}
+
+/* 10. Examples: scatter burst */
+@keyframes scatterBurst{
+  0%  {transform:translate(0,0) scale(1) rotate(var(--r0,0deg));opacity:.85;}
+  60% {opacity:.4;}
+  100%{transform:translate(var(--bx,50px),var(--by,-70px)) scale(.1) rotate(var(--re,400deg));opacity:0;}
+}
+
+/* ══ ELEMENT STYLES ══ */
+
+/* Coffee bean */
+.cb{
+  position:absolute;border-radius:50%;
+  background:radial-gradient(ellipse at 38% 32%, rgba(196,110,38,var(--ba,.78)) 0%, rgba(139,69,19,var(--ba,.78)) 55%, rgba(80,35,8,var(--ba,.78)) 100%);
+  box-shadow: inset 0 2px 5px rgba(255,200,120,.18), inset 0 -2px 4px rgba(40,12,0,.45), 0 3px 10px rgba(100,45,8,.28);
+}
+.cb::after{
+  content:'';position:absolute;
+  top:47%;left:13%;width:74%;height:2px;
+  background:linear-gradient(90deg, transparent, rgba(50,18,2,.62) 30%, rgba(50,18,2,.62) 70%, transparent);
+  border-radius:50%;
+  box-shadow:0 1.5px 0 rgba(80,30,5,.28), 0 -1.5px 0 rgba(255,180,80,.06);
+}
+
+/* Orbit wrapper — positions the orbital path centre */
+.orbit-wrap{position:absolute;width:0;height:0;}
+.orbit-bean{position:absolute;transform-origin:0 0;}
+
+/* Ink drop ring */
+.inkdrop{
+  position:absolute;border-radius:50%;border:2px solid;
+  border-color:rgba(181,101,29,var(--ia,.22));
+  animation:inkDrop var(--id,3.5s) ease-out infinite var(--idel,0s);
+}
+
+/* Steam wisp */
+.wisp{
+  position:absolute;border-radius:40% 60% 60% 40%/50%;
+  background:radial-gradient(ellipse, rgba(230,180,120,var(--sa,.14)) 0%, transparent 70%);
+  animation:steamCurl var(--sd,5s) ease-in-out infinite var(--sdel,0s);
+}
+
+/* Particle dot */
+.ptcl{
+  position:absolute;border-radius:50%;
+  background:rgba(181,101,29,var(--pa,.7));
+  animation:sparkle var(--pd,1.8s) ease-out infinite var(--pdel,0s);
+}
+
+/* Constellation node */
+.cnode{
+  position:absolute;border-radius:50%;width:5px;height:5px;
+  background:rgba(181,101,29,var(--ca,.55));
+  box-shadow:0 0 6px rgba(212,149,106,var(--ca,.3));
+  animation:cPulse var(--cpd,3s) ease-in-out infinite var(--cpdel,0s);
+}
+
+/* Roast glow orb */
+.rglow{
+  position:absolute;border-radius:50%;
+  animation:roastGlow var(--gd,6s) ease-in-out infinite var(--gdel,0s);
+}
+
+/* Scatter bean (examples burst) */
+.sburst{
+  position:absolute;border-radius:50%;
+  background:radial-gradient(ellipse at 38% 32%, rgba(196,110,38,var(--ba,.75)) 0%, rgba(139,69,19,var(--ba,.75)) 60%, rgba(80,35,8,var(--ba,.75)) 100%);
+  box-shadow:inset 0 2px 4px rgba(255,180,100,.16), 0 2px 8px rgba(100,45,8,.22);
+  animation:scatterBurst var(--bd,4s) ease-in infinite var(--bdel,0s);
+}
+.sburst::after{
+  content:'';position:absolute;top:47%;left:13%;width:74%;height:2px;
+  background:rgba(50,18,2,.55);border-radius:50%;
+}
+
+/* cursor sparkle */
+.cur-spark{
+  position:fixed;pointer-events:none;z-index:9999;
+  border-radius:50%;
+  background:radial-gradient(circle, rgba(212,149,106,.9), rgba(181,101,29,.4) 50%, transparent 70%);
+  animation:sparkle .9s ease-out forwards;
+}
+
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ══════════ SIDEBAR ══════════ -->
+<aside class="sidebar" id="sidebar">
+
+  <div class="sb-logo">
+    <div class="sb-logo-icon">
+      <div class="steam"><div class="sp"></div><div class="sp"></div><div class="sp"></div></div>
+      ☕
+    </div>
+    <span class="sb-logo-text">CFG.brew</span>
+  </div>
+
+  <div class="sb-section">WORKSPACE</div>
+
+  <button class="sb-item on" id="sb-simplify" data-tip="Simplify"
+    onclick="showView('simplify',this)">
+    <div class="sb-icon-wrap">✦</div>
+    <span class="sb-item-label">Simplify</span>
+  </button>
+  <button class="sb-item" id="sb-theory" data-tip="Theory"
+    onclick="showView('theory',this)">
+    <div class="sb-icon-wrap">📖</div>
+    <span class="sb-item-label">Theory</span>
+  </button>
+  <button class="sb-item" id="sb-examples" data-tip="Examples"
+    onclick="showView('examples',this)">
+    <div class="sb-icon-wrap">💡</div>
+    <span class="sb-item-label">Examples</span>
+  </button>
+
+  <div class="sb-divider"></div>
+  <div class="sb-section">QUICK EXAMPLES</div>
+
+  <div class="sb-ex-list" id="sb-ex-list"></div>
+
+  <div class="sb-bottom">
+    <div class="sb-author-row">
+      <div class="sb-author-icon">✍</div>
+      <div class="sb-author-text">CFG Engine<br>by Dhairya Kanojia</div>
+    </div>
+  </div>
+
+  <!-- sidebar mist -->
+  <div class="sb-mist" aria-hidden="true">
+    <div class="mist-layer m1"></div>
+    <div class="mist-layer m2"></div>
+    <div class="mist-layer m3"></div>
+    <div class="mist-layer m4"></div>
+    <div class="mist-layer m5"></div>
+  </div>
+</aside>
+
+<!-- ══════════ MAIN ══════════ -->
+<div class="main">
+
+  <!-- top bar -->
+  <div class="topbar">
+    <div class="page-title" id="page-title">
+      <span id="page-icon">✦</span>&nbsp;Grammar Simplifier
+    </div>
+    <div class="topbar-btns">
+      <button class="btn pri" id="brew-btn" onclick="simplify()">▶ Brew It!</button>
+      <button class="btn" onclick="clearAll()">⟳ Reset</button>
+      <button class="btn sm" onclick="openHelp()">? Format</button>
+    </div>
+  </div>
+
+  <!-- ── SIMPLIFY VIEW ── -->
+  <div class="view on" id="v-simplify">
+    <div class="simp-grid">
+
+      <!-- left col -->
+      <div style="display:flex;flex-direction:column;gap:1.1rem">
+        <div class="card">
+          <div class="card-ttl">INPUT GRAMMAR</div>
+          <div style="display:flex;align-items:flex-end;gap:10px;margin-bottom:.72rem">
+            <div>
+              <div class="flbl">START SYMBOL</div>
+              <input type="text" id="start-sym" value="S" class="sym-i">
+            </div>
+            <div style="flex:1;padding-bottom:1px">
+              <div class="flbl">FORMAT: A → B C | ε &nbsp;·&nbsp; one rule per line</div>
+            </div>
+          </div>
+          <div class="flbl">PRODUCTION RULES</div>
+          <div class="input-helpers">
+            <span class="helper-lbl">INSERT:</span>
+            <button class="ins-btn" title="Insert ε (epsilon / empty string)" onclick="insertAt('grammar-input','ε')">ε</button>
+            <button class="ins-btn" title="Insert → (arrow / produces)" onclick="insertAt('grammar-input',' → ')">→</button>
+            <button class="ins-btn" title="Insert | (alternative)" onclick="insertAt('grammar-input',' | ')">|</button>
+            <button class="typo-badge" id="typo-badge" onclick="fixTypos()" title="Click to auto-fix">⚡ Auto-fix typos detected</button>
+          </div>
+          <textarea class="gram-ta" id="grammar-input"
+            oninput="checkTypos()"
+            placeholder="S → A B | ε&#10;A → a A | a&#10;B → b B | b&#10;A → B"></textarea>
+          <div class="chips" id="stat-row" style="display:none">
+            <div class="chip"><span class="v" id="s-rules">0</span><span class="l">rules</span></div>
+            <div class="chip"><span class="v" id="s-vars">0</span><span class="l">vars</span></div>
+            <div class="chip"><span class="v" id="s-terms">0</span><span class="l">terminals</span></div>
+            <div class="chip"><span class="v" id="s-eps">0</span><span class="l">ε-rules</span></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-ttl">SIMPLIFIED GRAMMAR</div>
+          <div class="out-box" id="out-box">
+            <span class="out-ph">— simplified grammar will appear here —</span>
+          </div>
+          <div class="brow">
+            <button class="btn sm" onclick="copyOut()">⎘ Copy</button>
+            <button class="btn sm red" onclick="clearAll()">✕ Clear</button>
+          </div>
+          <!-- Abstraction Visualizer -->
+          <div class="abs-panel" id="abs-panel">
+            <div class="abs-panel-ttl">LIVE SIMPLIFICATION — watch rules change</div>
+            <div class="abs-rules" id="abs-rules">
+              <div class="abs-empty">Rules will animate here as simplification runs ☕</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- right col: steps -->
+      <div class="card" style="align-self:start">
+        <div class="card-ttl">STEP-BY-STEP TRACE</div>
+        <div class="prog-w"><div class="prog-b" id="prog-b"></div></div>
+        <div class="steps" id="steps-wrap">
+          <div class="empty">
+            <span class="big">☕</span>
+            Hit <strong style="color:var(--mocha)">"Brew It!"</strong> above<br>to see the step-by-step trace.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── THEORY VIEW ── -->
+  <div class="view" id="v-theory">
+    <div class="theory-2col">
+      <div class="card" style="padding:.88rem">
+        <div class="card-ttl">STEPS</div>
+        <div class="tnav">
+          <button class="tnav-btn on" onclick="theoryTab(this,'th0')"><span class="tnav-n">00</span>Overview</button>
+          <button class="tnav-btn" onclick="theoryTab(this,'th1')"><span class="tnav-n">01</span>ε-Elimination</button>
+          <button class="tnav-btn" onclick="theoryTab(this,'th2')"><span class="tnav-n">02</span>Unit Productions</button>
+          <button class="tnav-btn" onclick="theoryTab(this,'th3')"><span class="tnav-n">03</span>Useless Symbols</button>
+          <button class="tnav-btn" onclick="theoryTab(this,'th4')"><span class="tnav-n">04</span>Correct Order</button>
+        </div>
+      </div>
+      <div>
+        <div class="tpane on" id="th0">
+          <h2>CFG Simplification</h2>
+          <p class="sub">A context-free grammar can always be simplified without changing the language it generates. The process has four ordered steps — skipping or reordering them can break correctness.</p>
+          <div class="tstep"><span class="tstep-n">01</span><p>Eliminate <code>ε-productions</code> — rules of the form A → ε</p></div>
+          <div class="tstep"><span class="tstep-n">02</span><p>Remove <code>unit productions</code> — rules of the form A → B (single variable)</p></div>
+          <div class="tstep"><span class="tstep-n">03</span><p>Remove <code>non-generating</code> symbols — can never derive a terminal string</p></div>
+          <div class="tstep"><span class="tstep-n">04</span><p>Remove <code>unreachable</code> symbols — never appear in a derivation from S</p></div>
+          <div class="tip">💡 The order matters: <strong>ε first, then unit, then useless</strong>. Wrong order leaves behind symbols that should have been removed.</div>
+        </div>
+        <div class="tpane" id="th1">
+          <h2>ε-Production Elimination</h2>
+          <p class="sub">An ε-production is any rule A → ε. The goal is to remove all such rules while preserving every non-empty string the grammar generates.</p>
+          <div class="tstep"><span class="tstep-n">1</span><p>Find all <strong>nullable</strong> variables: X where X ⇒* ε. Start with direct ε-rules, then close transitively.</p></div>
+          <div class="tstep"><span class="tstep-n">2</span><p>For each production, generate every subset by optionally removing nullable symbols from the right-hand side.</p></div>
+          <div class="tstep"><span class="tstep-n">3</span><p>Delete all original ε-productions. Keep S → ε only if ε belongs to the language.</p></div>
+          <div class="tip">Example: If <code>B</code> is nullable and you have <code>A → a B c</code>, add <code>A → a c</code> as a new rule.</div>
+        </div>
+        <div class="tpane" id="th2">
+          <h2>Unit Production Removal</h2>
+          <p class="sub">A unit production is A → B where B is a single variable. These must be removed after ε-elimination.</p>
+          <div class="tstep"><span class="tstep-n">1</span><p>Compute unit pairs: (A, B) where A ⇒* B using only unit steps. Close transitively from (A, A) for each A.</p></div>
+          <div class="tstep"><span class="tstep-n">2</span><p>For each unit pair (A, B), copy all non-unit productions of B into A's production set.</p></div>
+          <div class="tstep"><span class="tstep-n">3</span><p>Remove all original unit productions from the grammar.</p></div>
+          <div class="tip">Example: If S → A → B → <code>a | b</code>, then S and A both get <code>a | b</code> added, and all unit rules are deleted.</div>
+        </div>
+        <div class="tpane" id="th3">
+          <h2>Useless Symbol Removal</h2>
+          <p class="sub">A symbol is useless if it can never generate a terminal string (non-generating) or can never be reached from S (unreachable).</p>
+          <div class="tstep"><span class="tstep-n">→</span><p><strong>Non-generating:</strong> no derivation from X ever produces only terminals. Remove these first.</p></div>
+          <div class="tstep"><span class="tstep-n">↔</span><p><strong>Unreachable:</strong> X never appears in any sentential form derived from S. Remove after non-generating pass.</p></div>
+          <div class="tip">⚠ Always remove non-generating before unreachable. The wrong order can leave behind symbols that appear reachable but are still useless.</div>
+        </div>
+        <div class="tpane" id="th4">
+          <h2>Correct Order</h2>
+          <p class="sub">These four steps must be applied in this exact sequence for a correct result:</p>
+          <div class="tstep"><span class="tstep-n">01</span><p>ε-elimination — removing unit rules before this causes new ε-productions to go unnoticed.</p></div>
+          <div class="tstep"><span class="tstep-n">02</span><p>Unit production removal — all ε-rules are gone, so unit pairs are clean to compute.</p></div>
+          <div class="tstep"><span class="tstep-n">03</span><p>Remove non-generating — rules are clean enough to check generation accurately.</p></div>
+          <div class="tstep"><span class="tstep-n">04</span><p>Remove unreachable — final pass to strip anything S can no longer reach.</p></div>
+          <div class="tip">After all four steps, the grammar is in <strong>reduced form</strong> — every variable is reachable, generating, and free of unit/ε rules.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── EXAMPLES VIEW ── -->
+  <div class="view" id="v-examples">
+    <div class="ex-hdr">
+      <h2>Preloaded Examples</h2>
+      <p>Each card shows the original grammar vs simplified result. Click <strong style="color:var(--mocha)">▶ Run & Simplify</strong> to load it and auto-run the full trace.</p>
+    </div>
+    <div class="ex-grid" id="ex-grid"></div>
+  </div>
+
+  <footer>Made by <span>Dhairya Kanojia</span> &nbsp;·&nbsp; CFG Simplification Engine</footer>
+</div>
+</div>
+
+<div id="toast"></div>
+
+<div class="mbg" id="mbg">
+  <div class="modal">
+    <button class="modal-close" onclick="closeHelp()">×</button>
+    <h2>☕ Format Guide</h2>
+    <p>One production per line. Use <span class="ci">→</span> or <span class="ci">-></span> to separate left and right sides.</p>
+    <p>Use <span class="ci">|</span> for multiple alternatives. Use <span class="ci">ε</span> or <span class="ci">eps</span> for the empty string.</p>
+    <p><strong style="color:var(--roast)">Variables</strong> = uppercase (A–Z) &nbsp;·&nbsp; <strong style="color:var(--roast)">Terminals</strong> = lowercase/symbols</p>
+    <div class="mcod">S → A B | ε<br>A → a A | a<br>B → b B | ε<br>C → c  ← removed if unreachable</div>
+    <p style="font-size:.75rem;color:var(--t3);margin-top:.4rem">💡 Use the <strong>ε</strong> and <strong>→</strong> buttons above the input to insert symbols without typing them.</p>
+    <button class="btn pri" style="width:100%;margin-top:.5rem;justify-content:center" onclick="closeHelp()">Got it! ☕</button>
+  </div>
+</div>
+<script>
+// ════════════════════════════════════
+// VIEW NAVIGATION
+// ════════════════════════════════════
+const viewMeta={
+  simplify:{icon:'✦',title:'Grammar Simplifier'},
+  theory:{icon:'📖',title:'Simplification Theory'},
+  examples:{icon:'💡',title:'Preloaded Examples'}
+};
+function showView(id,btn){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
+  document.querySelectorAll('.sb-item').forEach(b=>b.classList.remove('on'));
+  document.getElementById('v-'+id).classList.add('on');
+  const sbBtn=document.getElementById('sb-'+id);
+  if(sbBtn)sbBtn.classList.add('on');
+  const m=viewMeta[id];
+  document.getElementById('page-icon').textContent=m.icon;
+  document.getElementById('page-title').innerHTML=`<span id="page-icon">${m.icon}</span>&nbsp;${m.title}`;
+  document.getElementById('brew-btn').style.display=id==='simplify'?'':'none';
+}
+function theoryTab(btn,id){
+  btn.closest('.theory-2col').querySelectorAll('.tnav-btn').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('.tpane').forEach(p=>p.classList.remove('on'));
+  btn.classList.add('on');document.getElementById(id).classList.add('on');
+}
+function openHelp(){document.getElementById('mbg').classList.add('open')}
+function closeHelp(){document.getElementById('mbg').classList.remove('open')}
+document.getElementById('mbg').addEventListener('click',e=>{if(e.target===e.currentTarget)closeHelp()});
+
+// ════════════════════════════════════
+// GRAMMAR ENGINE
+// ════════════════════════════════════
+const isVar=s=>/^[A-Z]$/.test(s);
+const isTerm=s=>!isVar(s)&&s!=='ε';
+function toast(msg,d=2700){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),d)}
+function parseG(text){
+  const p={};
+  text.trim().split('\n').forEach(line=>{
+    line=line.trim();if(!line)return;
+    const sep=line.includes('→')?'→':'->';
+    const pts=line.split(sep);if(pts.length<2)return;
+    const lhs=pts[0].trim();
+    pts.slice(1).join(sep).split('|').forEach(r=>{
+      const s=r.trim().replace(/eps(ilon)?/gi,'ε')||'ε';
+      if(!p[lhs])p[lhs]=[];if(!p[lhs].includes(s))p[lhs].push(s);
+    });
+  });return p;
+}
+function tok(r){if(r==='ε')return['ε'];return[...r].filter(c=>c!==' ')}
+function p2s(p,st){return Object.keys(p).sort((a,b)=>a===st?-1:b===st?1:a.localeCompare(b)).filter(k=>p[k]&&p[k].length).map(k=>`${k} → ${p[k].join(' | ')}`).join('\n')}
+function nullable(p){const N=new Set();for(const[l,rs]of Object.entries(p))if(rs.includes('ε'))N.add(l);let ch=true;while(ch){ch=false;for(const[l,rs]of Object.entries(p)){if(N.has(l))continue;if(rs.some(r=>tok(r).every(t=>N.has(t)))){N.add(l);ch=true;}}}return N}
+function elimEps(p,st){const N=nullable(p),out={};for(const[l,rs]of Object.entries(p)){out[l]=[];rs.forEach(r=>{if(r==='ε')return;const tks=tok(r),ni=tks.map((t,i)=>N.has(t)?i:-1).filter(i=>i>=0);const c=new Set();for(let m=0;m<(1<<ni.length);m++){const om=new Set(ni.filter((_,b)=>m&(1<<b)));const res=tks.filter((_,i)=>!om.has(i)).join(' ');if(res)c.add(res);}c.forEach(x=>{if(!out[l].includes(x))out[l].push(x);});});}if(N.has(st)&&!out[st].includes('ε'))out[st].push('ε');return{p:out,N}}
+function elimUnit(p){const out={};for(const A of Object.keys(p)){const R=new Set([A]),q=[A];while(q.length){const c=q.shift();(p[c]||[]).forEach(r=>{const t=tok(r);if(t.length===1&&isVar(t[0])&&!R.has(t[0])){R.add(t[0]);q.push(t[0]);}});}out[A]=[];R.forEach(B=>{(p[B]||[]).forEach(r=>{const t=tok(r);if(!(t.length===1&&isVar(t[0]))&&!out[A].includes(r))out[A].push(r);});});}return out}
+function elimUseless(p,st){const gen=new Set();for(const[l,rs]of Object.entries(p))rs.forEach(r=>{if(tok(r).every(t=>!isVar(t)))gen.add(l);});let ch=true;while(ch){ch=false;for(const[l,rs]of Object.entries(p)){if(gen.has(l))continue;if(rs.some(r=>tok(r).every(t=>!isVar(t)||gen.has(t)))){gen.add(l);ch=true;}}}const p2={};for(const[l,rs]of Object.entries(p)){if(!gen.has(l))continue;p2[l]=rs.filter(r=>tok(r).every(t=>!isVar(t)||gen.has(t)));}const reach=new Set([st]),q2=[st];while(q2.length){const c=q2.shift();(p2[c]||[]).forEach(r=>tok(r).forEach(t=>{if(isVar(t)&&!reach.has(t)){reach.add(t);q2.push(t);}}));}const p3={};for(const[l,rs]of Object.entries(p2)){if(!reach.has(l))continue;p3[l]=rs.filter(r=>tok(r).every(t=>!isVar(t)||reach.has(t)));}return{p:p3,gen,reach}}
+
+// ════════════════════════════════════
+// STEP BUILDER
+// ════════════════════════════════════
+function mkB(txt,t){return`<span class="bg ${t}">${txt}</span>`}
+function addStep(w,n,title,desc,res,bh){
+  const el=document.createElement('div');el.className='si';
+  el.innerHTML=`<div class="snum">${String(n).padStart(2,'0')}</div>
+    <div class="sbody"><div class="vl"></div><h3>${title}</h3><p>${desc}</p>
+    ${bh?`<div class="bgs">${bh}</div>`:''}
+    ${res?`<div class="sres">${res}</div>`:''}</div>`;
+  w.appendChild(el);setTimeout(()=>el.classList.add('vis'),40);
+}
+function setProg(v){document.getElementById('prog-b').style.width=v+'%'}
+
+// ════════════════════════════════════
+// SIMPLIFY
+// ════════════════════════════════════
+function simplify(){
+  const raw=document.getElementById('grammar-input').value.trim();
+  const st=document.getElementById('start-sym').value.trim()||'S';
+  if(!raw){toast('☕ Enter a grammar first!');return;}
+  const w=document.getElementById('steps-wrap');w.innerHTML='';setProg(0);
+  const orig=parseG(raw);
+  if(!orig[st]){toast('⚠ Start symbol not found!');return;}
+  const rC=Object.values(orig).reduce((s,a)=>s+a.length,0);
+  const terms=new Set(Object.values(orig).flat().flatMap(r=>tok(r)).filter(isTerm));
+  document.getElementById('s-rules').textContent=rC;
+  document.getElementById('s-vars').textContent=Object.keys(orig).length;
+  document.getElementById('s-terms').textContent=terms.size;
+  document.getElementById('s-eps').textContent=Object.values(orig).flat().filter(r=>r==='ε').length;
+  document.getElementById('stat-row').style.display='flex';
+
+  // seed the abstraction visualizer with the original rules
+  absReset(orig, st);
+
+  let n=0;const dl=(fn,ms)=>setTimeout(fn,ms);
+  dl(()=>{n++;addStep(w,n,'Grammar Parsed ✓','Identified all variables, terminals and productions.',p2s(orig,st),Object.keys(orig).map(k=>mkB(k,'i')).join(' ')+' '+[...terms].map(t=>mkB(t,'a')).join(' '));setProg(14);},100);
+
+  dl(()=>{
+    const{p:p1,N}=elimEps(orig,st);n++;
+    addStep(w,n,'ε-Productions Eliminated',N.size?`Found ${N.size} nullable var(s). Generated all combinations.`:'No ε-productions found. Nothing changed.',p2s(p1,st),N.size?[...N].map(v=>mkB(v+' nullable','r')).join(' '):mkB('none found','a'));setProg(38);
+
+    // Abstraction: show ε rules erasing, new combo rules arriving
+    const epsPhase={label:'Step 1 — Remove ε-rules'};
+    epsPhase.remove=[];
+    epsPhase.add=[];
+    for(const[lhs,rs] of Object.entries(orig)){
+      rs.forEach(r=>{if(r==='ε')epsPhase.remove.push(lhs+'→'+r);});
+    }
+    for(const[lhs,rs] of Object.entries(p1)){
+      const origRs=(orig[lhs]||[]);
+      rs.forEach(r=>{if(!origRs.includes(r))epsPhase.add.push(lhs+' → '+r);});
+    }
+    absAnimate([epsPhase]);
+
+    dl(()=>{
+      const p2=elimUnit(p1);n++;
+      const uC=Object.values(p1).flat().filter(r=>{const t=tok(r);return t.length===1&&isVar(t[0]);}).length;
+      addStep(w,n,'Unit Productions Removed',uC?`Found ${uC} unit production(s). Propagated terminal rules.`:'No unit productions found.',p2s(p2,st),uC?mkB(uC+' unit rules removed','r'):mkB('none found','a'));setProg(62);
+
+      // Abstraction: remove unit rules, add inherited terminals
+      const unitPhase={label:'Step 2 — Remove unit rules'};
+      unitPhase.remove=[];unitPhase.add=[];
+      for(const[lhs,rs] of Object.entries(p1)){
+        rs.forEach(r=>{const t=tok(r);if(t.length===1&&isVar(t[0]))unitPhase.remove.push(lhs+'→'+r);});
+      }
+      for(const[lhs,rs] of Object.entries(p2)){
+        const p1Rs=(p1[lhs]||[]);
+        rs.forEach(r=>{if(!p1Rs.includes(r))unitPhase.add.push(lhs+' → '+r);});
+      }
+      absAnimate([unitPhase]);
+
+      dl(()=>{
+        const{p:p3,gen,reach}=elimUseless(p2,st);n++;
+        const allV=new Set(Object.keys(p2));
+        const useless=[...allV].filter(v=>!gen.has(v)||!reach.has(v));
+        addStep(w,n,'Useless Symbols Removed',useless.length?`Removed ${useless.length} useless symbol(s).`:'All symbols are useful. Nothing removed.',p2s(p3,st),[...gen].map(g=>mkB(g+'✓','a')).join(' ')+' '+useless.map(u=>mkB(u+'✗','r')).join(' '));setProg(86);
+
+        // Abstraction: erase all rules for useless symbols
+        const uselessPhase={label:'Step 3 — Erase useless symbols'};
+        uselessPhase.remove=[];
+        useless.forEach(v=>{
+          (p2[v]||[]).forEach(r=>uselessPhase.remove.push(v+'→'+r));
+          // also erase rules from OTHER vars that produce useless symbols
+          for(const[lhs,rs] of Object.entries(p2)){
+            rs.forEach(r=>{if(tok(r).some(t=>t===v))uselessPhase.remove.push(lhs+'→'+r);});
+          }
+        });
+        absAnimate([uselessPhase]);
+
+        dl(()=>{
+          n++;const fS=p2s(p3,st),fR=Object.values(p3).reduce((s,a)=>s+a.length,0);
+          addStep(w,n,'All Done! 🎉',`Reduced from ${rC} to ${fR} production(s). Language fully preserved.`,null,mkB(`${rC}→${fR} rules`,'i')+mkB('language preserved','a'));setProg(100);
+          const ob=document.getElementById('out-box');ob.innerHTML='';
+          ob.textContent=fS||'(Empty — no valid productions remain)';
+          toast('✓ Grammar brewed successfully!');
+          ob.scrollIntoView({behavior:'smooth',block:'nearest'});
+        },600);
+      },600);
+    },600);
+  },480);
+}
+
+// ════════════════════════════════════
+// EXAMPLES
+// ════════════════════════════════════
+const EX=[
+  {title:'ε-Production Elimination',tag:'NULLABLE',start:'S',
+   grammar:`S → A B | ε\nA → a A | a\nB → b B | b\nA → B`,
+   simplified:`S → A B | a B | A b | a b | ε\nA → a A | a\nB → b B | b`,
+   changes:[{t:'S→ε removed',r:1},{t:'A→B unit removed',r:1},{t:'combos added',r:0}],
+   desc:'S has an ε-rule and A has a unit production. Both get cleaned while preserving the language.'},
+  {title:'Unreachable Symbols',tag:'UNREACHABLE',start:'S',
+   grammar:`S → a S | b\nX → x Y\nY → y X | y\nZ → z`,
+   simplified:`S → a S | b`,
+   changes:[{t:'X removed',r:1},{t:'Y removed',r:1},{t:'Z removed',r:1}],
+   desc:'X, Y, Z are never reachable from S. They are stripped from the grammar entirely.'},
+  {title:'Multi-Nullable Variables',tag:'COMPLEX ε',start:'S',
+   grammar:`S → A B C\nA → a A | ε\nB → b B | ε\nC → c C | c`,
+   simplified:`S → A B C | A C | B C | C | A B | A | B\nA → a A | a\nB → b B | b\nC → c C | c`,
+   changes:[{t:'A nullable',r:1},{t:'B nullable',r:1},{t:'6 combos added',r:0}],
+   desc:'Both A and B are nullable. Every include/exclude combination in S→ABC is generated.'},
+  {title:'Unit Production Chain',tag:'UNIT CHAIN',start:'S',
+   grammar:`S → A\nA → B\nB → C\nC → a | b`,
+   simplified:`S → a | b\nA → a | b\nB → a | b\nC → a | b`,
+   changes:[{t:'S→A removed',r:1},{t:'A→B removed',r:1},{t:'B→C removed',r:1},{t:'terminals propagated',r:0}],
+   desc:'Chain S→A→B→C resolved. Each variable inherits terminal rules transitively.'},
+  {title:'Non-Generating Symbols',tag:'NON-GEN',start:'S',
+   grammar:`S → a B | A\nA → a\nB → b C\nC → c B`,
+   simplified:`S → A\nA → a`,
+   changes:[{t:'B non-generating',r:1},{t:'C non-generating',r:1},{t:'S→aB removed',r:1}],
+   desc:'B and C loop forever and never derive terminal strings. Removed as non-generating.'},
+  {title:'All Steps Combined',tag:'ALL STEPS',start:'S',
+   grammar:`S → A B | ε\nA → a | ε\nB → b B | b\nC → c\nD → d E\nE → e D`,
+   simplified:`S → A B | A b | a B | a b | B | b | ε\nA → a\nB → b B | b`,
+   changes:[{t:'ε eliminated',r:1},{t:'C unreachable',r:1},{t:'D,E non-gen',r:1},{t:'combos added',r:0}],
+   desc:'All four simplification steps triggered at once — the perfect full demo!'}
+];
+
+function renderExamples(){
+  // sidebar quick list
+  const sl=document.getElementById('sb-ex-list');sl.innerHTML='';
+  EX.forEach((ex,i)=>{
+    const b=document.createElement('button');b.className='sb-ex-btn';
+    b.innerHTML=`<div class="ex-dot"></div><span class="ex-name-s">${ex.title}</span><span class="ex-tag-s">${ex.tag}</span>`;
+    b.onclick=()=>runEx(i);sl.appendChild(b);
+  });
+  // main cards
+  const g=document.getElementById('ex-grid');g.innerHTML='';
+  EX.forEach((ex,i)=>{
+    const el=document.createElement('div');el.className='ex-card';
+    const pills=ex.changes.map(c=>`<span class="ex-pill ${c.r?'r':'a'}">${c.t}</span>`).join('');
+    el.innerHTML=`
+      <div class="ex-card-h"><h3>${ex.title}</h3><span class="ex-tag">${ex.tag}</span></div>
+      <div class="ex-cols">
+        <div class="ex-col"><div class="ex-col-lbl b">ORIGINAL</div><div class="ex-code b">${ex.grammar.replace(/\n/g,'<br>')}</div></div>
+        <div class="ex-col"><div class="ex-col-lbl a">SIMPLIFIED</div><div class="ex-code a">${ex.simplified.replace(/\n/g,'<br>')}</div></div>
+      </div>
+      <div class="ex-pills">${pills}</div>
+      <div class="ex-desc">${ex.desc}</div>
+      <div class="ex-foot"><button class="ex-run" onclick="runEx(${i})">▶ Run &amp; Simplify →</button></div>`;
+    g.appendChild(el);
+  });
+}
+
+function runEx(i){
+  document.getElementById('start-sym').value=EX[i].start;
+  document.getElementById('grammar-input').value=EX[i].grammar;
+  showView('simplify',document.getElementById('sb-simplify'));
+  toast('⚡ Example loaded — brewing...');
+  setTimeout(()=>simplify(),500);
+}
+renderExamples();
+
+// ════════════════════════════════════
+// CLEAR & COPY
+// ════════════════════════════════════
+function clearAll(){
+  document.getElementById('grammar-input').value='';
+  document.getElementById('start-sym').value='S';
+  document.getElementById('steps-wrap').innerHTML='<div class="empty"><span class="big">☕</span>Hit <strong style="color:var(--mocha)">"Brew It!"</strong> above<br>to run the simplification.</div>';
+  document.getElementById('out-box').innerHTML='<span class="out-ph">— simplified grammar will appear here —</span>';
+  document.getElementById('stat-row').style.display='none';
+  document.getElementById('abs-rules').innerHTML='<div class="abs-empty">Rules will animate here as simplification runs ☕</div>';
+  document.getElementById('typo-badge').classList.remove('show');
+  setProg(0);toast('Cleared ☕');
+}
+function copyOut(){
+  const t=document.getElementById('out-box').textContent.trim();
+  if(t.startsWith('—')){toast('Nothing to copy yet!');return;}
+  navigator.clipboard.writeText(t).then(()=>toast('⎘ Copied!'));
+}
+
+// ════════════════════════════════════
+// INSERT AT CURSOR
+// ════════════════════════════════════
+function insertAt(id, text){
+  const ta=document.getElementById(id);
+  ta.focus();
+  const s=ta.selectionStart, e=ta.selectionEnd;
+  ta.value=ta.value.slice(0,s)+text+ta.value.slice(e);
+  ta.selectionStart=ta.selectionEnd=s+text.length;
+  checkTypos();
+}
+
+// ════════════════════════════════════
+// TYPO DETECTION & AUTO-FIX
+// ════════════════════════════════════
+function checkTypos(){
+  const v=document.getElementById('grammar-input').value;
+  const badge=document.getElementById('typo-badge');
+  // Detect: lowercase lhs before arrow, "->", "epsilon", "eps" (not already ε)
+  const hasTypo=/^\s*[a-z]\s*(→|->)/m.test(v)
+    || v.includes('->')
+    || /\bepsilon\b/i.test(v)
+    || /\beps\b/i.test(v);
+  badge.classList.toggle('show', hasTypo);
+}
+function fixTypos(){
+  const ta=document.getElementById('grammar-input');
+  let v=ta.value;
+  // Fix -> to →
+  v=v.replace(/->/g,'→');
+  // Fix epsilon / eps to ε
+  v=v.replace(/\bepsilon\b/gi,'ε');
+  v=v.replace(/\beps\b/gi,'ε');
+  // Fix lowercase LHS variable before arrow → uppercase
+  v=v.replace(/^(\s*)([a-z])(\s*→)/gm,(m,sp,ch,arr)=>sp+ch.toUpperCase()+arr);
+  ta.value=v;
+  document.getElementById('typo-badge').classList.remove('show');
+  toast('✓ Typos fixed automatically!');
+}
+
+// ════════════════════════════════════
+// ABSTRACTION VISUALIZER
+// ════════════════════════════════════
+function absReset(rulesObj, startSym){
+  const container=document.getElementById('abs-rules');
+  container.innerHTML='';
+  for(const [lhs, prods] of Object.entries(rulesObj)){
+    prods.forEach(prod=>{
+      const el=document.createElement('div');
+      el.className='abs-rule';
+      el.dataset.key=lhs+'→'+prod;
+      el.textContent=lhs+' → '+prod;
+      container.appendChild(el);
+    });
+  }
+}
+
+function absAnimate(phases){
+  // phases: [{label, remove:['A→x'], add:['A→y']}, ...]
+  let delay=400;
+  phases.forEach(phase=>{
+    setTimeout(()=>{
+      // add step label
+      const container=document.getElementById('abs-rules');
+      if(phase.label){
+        const lbl=document.createElement('div');
+        lbl.className='abs-step-lbl';
+        lbl.textContent='▸ '+phase.label;
+        container.appendChild(lbl);
+      }
+      // mark removals
+      if(phase.remove){
+        phase.remove.forEach(key=>{
+          const el=container.querySelector('[data-key="'+key+'"]');
+          if(el) el.classList.add('removing');
+        });
+      }
+    }, delay);
+    delay+=500;
+
+    setTimeout(()=>{
+      const container=document.getElementById('abs-rules');
+      // erase removals
+      if(phase.remove){
+        phase.remove.forEach(key=>{
+          const el=container.querySelector('[data-key="'+key+'"]');
+          if(el) el.classList.add('gone');
+        });
+      }
+      // add new rules
+      if(phase.add){
+        phase.add.forEach(text=>{
+          const key=text.replace(' → ','→').replace(/\s+/g,' ');
+          if(!container.querySelector('[data-key="'+key+'"]')){
+            const el=document.createElement('div');
+            el.className='abs-rule arriving';
+            el.dataset.key=key;
+            el.textContent=text;
+            container.appendChild(el);
+          }
+        });
+      }
+    }, delay);
+    delay+=650;
+  });
+}
+
+
+
+// ═══════════════════════════════════════════════════════
+// VERSION B — CREATIVE "Coffee Cosmos" Animation Engine
+// ═══════════════════════════════════════════════════════
+(function(){
+  const R=(a,b)=>Math.random()*(b-a)+a;
+  const S=()=>Math.random()<.5?1:-1;
+  const RI=(a,b)=>Math.floor(R(a,b));
+  function mk(tag,cls){const e=document.createElement(tag);if(cls)e.className=cls;return e;}
+  function css(el,s){el.style.cssText=s;return el;}
+  function inject(id,fn){
+    const v=document.getElementById(id);if(!v)return;
+    const bg=mk('div','vbg');fn(bg);v.insertBefore(bg,v.firstChild);
+  }
+
+  // ── Floating bean helper ──
+  function floatBean(bg,x,y,w){
+    const h=w*R(.50,.62);
+    const d=mk('div','cb');
+    css(d,`width:${w}px;height:${h}px;left:${x}%;top:${y}%;
+      --r0:${R(0,360)}deg;
+      --fx1:${S()*R(6,22)}px;--fy1:${S()*R(8,24)}px;--fr1:${R(-25,25)}deg;
+      --fx2:${S()*R(8,28)}px;--fy2:${S()*R(12,30)}px;--fr2:${R(-20,20)}deg;
+      --fx3:${S()*R(5,18)}px;--fy3:${S()*R(6,22)}px;--fr3:${R(-28,28)}deg;
+      animation:bFloat ${R(16,38)}s ease-in-out infinite ${R(0,24)}s;`);
+    bg.appendChild(d);
+  }
+
+  // ── Roast glow helper ──
+  function glow(bg,x,y,sz,a){
+    const g=mk('div','rglow');
+    css(g,`width:${sz}px;height:${sz}px;left:${x}%;top:${y}%;
+      background:radial-gradient(circle,rgba(212,149,106,${a*1.6}),rgba(181,101,29,${a*.5}) 45%,transparent 68%);
+      --ga:${a};--gd:${R(5,12)}s;--gdel:${R(0,14)}s;`);
+    bg.appendChild(g);
+  }
+
+  // ── SIMPLIFY: orbiting bean systems + ink drops + steam wisps ──
+  inject('v-simplify',bg=>{
+    // 3 orbital systems
+    [[22,35,3,45,90],[68,28,4,35,80],[55,68,2,55,100]].forEach(([cx,cy,count,rMin,rMax])=>{
+      for(let i=0;i<count;i++){
+        const radius=R(rMin,rMax);
+        const bw=R(12,34),bh=bw*R(.50,.62);
+        const wrap=mk('div','orbit-wrap');
+        css(wrap,`left:${cx}%;top:${cy}%;`);
+        const bel=mk('div','cb');
+        const startDeg=R(0,360);
+        css(bel,`width:${bw}px;height:${bh}px;position:absolute;
+          top:${-bh/2}px;left:${-bw/2}px;
+          transform-origin:${radius}px ${bh/2}px;
+          animation:orbit ${R(18,55)}s linear infinite ${R(0,20)}s;--or:${radius}px;`);
+        bel.style.transform=`rotate(${startDeg}deg) translateX(${radius}px) rotate(-${startDeg}deg)`;
+        wrap.appendChild(bel);
+        bg.appendChild(wrap);
+      }
+    });
+    // 20 free-floating beans
+    for(let i=0;i<20;i++) floatBean(bg,R(1,96),R(1,94),R(10,40));
+    // 5 ink drop clusters (3 rings each)
+    for(let c=0;c<5;c++){
+      const cx=R(8,90),cy=R(10,85);
+      for(let j=0;j<3;j++){
+        const d=mk('div','inkdrop');
+        const w=R(60,180),h=w*R(.28,.42);
+        const dur=R(3.5,7);
+        css(d,`width:${w}px;height:${h}px;
+          left:calc(${cx}% - ${w/2}px);top:calc(${cy}% - ${h/2}px);
+          --ia:${R(.15,.32)};--id:${dur}s;--idel:${j*(dur/3)+R(0,.5)}s;--is:${R(3,5.5)};`);
+        bg.appendChild(d);
+      }
+    }
+    // 16 steam wisps
+    for(let i=0;i<16;i++){
+      const w=mk('div','wisp');
+      const ww=R(28,90),wh=ww*R(.55,.85);
+      css(w,`width:${ww}px;height:${wh}px;left:${R(2,94)}%;bottom:${R(-5,15)}%;
+        --sa:${R(.08,.2)};--sd:${R(4,11)}s;--sdel:${R(0,18)}s;
+        --sy:${-R(80,160)}px;--sy2:${-R(160,280)}px;
+        --ss:${S()*R(8,22)}deg;--ss2:${S()*R(5,16)}deg;`);
+      bg.appendChild(w);
+    }
+    [[12,20,280,.07],[55,10,220,.06],[80,55,300,.08],[30,70,200,.06],[70,80,180,.05]].forEach(([x,y,sz,a])=>glow(bg,x,y,sz,a));
+  });
+
+  // ── THEORY: bean constellation with SVG lines + wave bands ──
+  inject('v-theory',bg=>{
+    // Constellation nodes + SVG lines
+    const nodes=[];
+    for(let i=0;i<18;i++){
+      const x=R(5,95),y=R(5,92);
+      nodes.push({x,y});
+      const n=mk('div','cnode');
+      css(n,`left:${x}%;top:${y}%;--ca:${R(.3,.7)};--ca2:${R(.6,.95)};--cpd:${R(2.5,6)}s;--cpdel:${R(0,8)}s;`);
+      bg.appendChild(n);
+    }
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.style.cssText='position:absolute;inset:0;width:100%;height:100%;pointer-events:none;';
+    nodes.forEach((a,i)=>{
+      nodes.slice(i+1).forEach(b=>{
+        if(Math.hypot(a.x-b.x,a.y-b.y)<28){
+          const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+          line.setAttribute('x1',a.x+'%');line.setAttribute('y1',a.y+'%');
+          line.setAttribute('x2',b.x+'%');line.setAttribute('y2',b.y+'%');
+          line.setAttribute('stroke',`rgba(181,101,29,${R(.08,.2)})`);
+          line.setAttribute('stroke-width','1');
+          svg.appendChild(line);
+        }
+      });
+    });
+    bg.appendChild(svg);
+    // 30 depth beans
+    for(let i=0;i<30;i++){
+      const d=mk('div','cb');
+      const w=R(10,44),h=w*R(.50,.62);
+      css(d,`width:${w}px;height:${h}px;left:${R(0,95)}%;top:${R(0,94)}%;
+        filter:blur(${R(0,2.5)}px);
+        --r0:${R(0,360)}deg;
+        --fx1:${S()*R(5,18)}px;--fy1:${S()*R(4,16)}px;--fr1:${R(-18,18)}deg;
+        --fx2:${S()*R(7,22)}px;--fy2:${S()*R(6,20)}px;--fr2:${R(-14,14)}deg;
+        --fx3:${S()*R(4,14)}px;--fy3:${S()*R(5,18)}px;--fr3:${R(-20,20)}deg;
+        animation:bFloat ${R(18,42)}s ease-in-out infinite ${R(0,26)}s;`);
+      bg.appendChild(d);
+    }
+    // 3 horizontal wave bands
+    for(let i=0;i<3;i++){
+      const w=mk('div');
+      css(w,`position:absolute;left:0;width:100%;height:${R(18,40)}px;top:${R(20,75)}%;
+        background:linear-gradient(90deg,transparent,rgba(181,101,29,${R(.04,.09)}) 30%,rgba(212,149,106,${R(.06,.12)}) 50%,rgba(181,101,29,${R(.04,.09)}) 70%,transparent);
+        border-radius:50%;animation:wavePass ${R(10,22)}s ease-in-out infinite ${R(0,14)}s;`);
+      bg.appendChild(w);
+    }
+    [[8,12,300,.07],[62,8,250,.06],[85,50,280,.07],[20,65,220,.06],[50,85,200,.05]].forEach(([x,y,sz,a])=>glow(bg,x,y,sz,a));
+  });
+
+  // ── EXAMPLES: scatter burst + sparkles + ambient beans ──
+  inject('v-examples',bg=>{
+    // 5 scatter burst epicentres
+    for(let c=0;c<5;c++){
+      const cx=R(10,88),cy=R(10,85);
+      for(let i=0;i<RI(5,10);i++){
+        const d=mk('div','sburst');
+        const w=R(9,32),h=w*R(.50,.62);
+        const ang=R(0,Math.PI*2);
+        const dist=R(40,180);
+        css(d,`width:${w}px;height:${h}px;
+          left:calc(${cx}% - ${w/2}px);top:calc(${cy}% - ${h/2}px);
+          --ba:${R(.55,.85)};--bd:${R(2.8,7)}s;--bdel:${R(0,14)}s;
+          --bx:${Math.cos(ang)*dist}px;--by:${Math.sin(ang)*dist}px;
+          --r0:${R(0,360)}deg;--re:${S()*R(200,500)}deg;`);
+        bg.appendChild(d);
+      }
+    }
+    // 22 ambient floating beans
+    for(let i=0;i<22;i++) floatBean(bg,R(1,96),R(1,94),R(10,38));
+    // 40 sparkle particles
+    for(let i=0;i<40;i++){
+      const p=mk('div','ptcl');
+      const sz=R(2,7);
+      css(p,`width:${sz}px;height:${sz}px;left:${R(2,96)}%;top:${R(5,92)}%;
+        --pa:${R(.5,.9)};--spx:${S()*R(20,80)}px;--spy:${S()*R(15,70)}px;
+        --pd:${R(1.4,4.5)}s;--pdel:${R(0,16)}s;`);
+      bg.appendChild(p);
+    }
+    // 6 ink drop ring pairs
+    for(let c=0;c<6;c++){
+      const cx=R(8,90),cy=R(10,85);
+      for(let j=0;j<2;j++){
+        const d=mk('div','inkdrop');
+        const w=R(50,140),h=w*R(.26,.4);
+        const dur=R(3,6);
+        css(d,`width:${w}px;height:${h}px;
+          left:calc(${cx}% - ${w/2}px);top:calc(${cy}% - ${h/2}px);
+          --ia:${R(.12,.28)};--id:${dur}s;--idel:${j*(dur/2)+R(0,.5)}s;--is:${R(3,5)};`);
+        bg.appendChild(d);
+      }
+    }
+    [[5,8,260,.07],[60,5,230,.06],[88,45,290,.07],[25,72,210,.06],[65,82,200,.05]].forEach(([x,y,sz,a])=>glow(bg,x,y,sz,a));
+  });
+
+  // ── CURSOR SPARKLE — caramel dots trail the mouse ──
+  let lastSparkle=0;
+  document.addEventListener('mousemove',e=>{
+    const now=Date.now();
+    if(now-lastSparkle<60) return;
+    lastSparkle=now;
+    const sz=R(5,14);
+    const s=mk('div','cur-spark');
+    s.style.cssText=`width:${sz}px;height:${sz}px;left:${e.clientX-sz/2}px;top:${e.clientY-sz/2}px;
+      --spx:${S()*R(8,28)}px;--spy:${S()*R(-28,-8)}px;`;
+    document.body.appendChild(s);
+    setTimeout(()=>s.remove(),950);
+  });
+
+})();
+
+</script>
+</body>
+</html>
